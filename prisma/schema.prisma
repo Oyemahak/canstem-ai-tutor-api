@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // later: change to "mysql" for Cloudways
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  student
+  teacher
+  admin
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String   // hashed (bcryptjs)
+  role      Role     @default(student)
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coursesTaught  Course[]       @relation("TeacherCourses")
+  enrollments    Enrollment[]
+  conversations  Conversation[]
+  messages       Message[]
+  uploads        CourseFile[]
+}
+
+model Course {
+  id           String   @id // e.g., FRE1D
+  name         String
+  description  String?
+  isLive       Boolean  @default(true)
+
+  teacherId    String?
+  teacher      User?    @relation("TeacherCourses", fields: [teacherId], references: [id])
+
+  vectorStoreId String? // OpenAI vector store id for this course
+
+  enrollments  Enrollment[]
+  files        CourseFile[]
+  conversations Conversation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  status    String   @default("active") // active | inactive
+
+  user      User     @relation(fields: [userId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+  @@index([userId])
+}
+
+model CourseFile {
+  id           String   @id @default(cuid())
+  courseId     String
+  uploaderId   String
+
+  course       Course   @relation(fields: [courseId], references: [id])
+  uploader     User     @relation(fields: [uploaderId], references: [id])
+
+  originalName String
+  storagePath  String
+  mimeType     String
+  sizeBytes    Int
+  openaiFileId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([courseId])
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  title     String?
+
+  user      User     @relation(fields: [userId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id])
+
+  messages  Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([courseId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  role           String   // user | assistant
+  content        String
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+}
