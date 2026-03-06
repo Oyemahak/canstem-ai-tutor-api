@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -24,30 +26,73 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  coursesTaught  Course[]       @relation("TeacherCourses")
-  enrollments    Enrollment[]
-  conversations  Conversation[]
-  messages       Message[]
-  uploads        CourseFile[]
+  // Relations
+  enrollments   Enrollment[]
+  conversations Conversation[]
+  messages      Message[]
+  uploads       CourseFile[]
+
+  // ✅ Multi-teacher support:
+  teaching      CourseTeacher[]
 }
 
 model Course {
-  id           String   @id // e.g., FRE1D
-  name         String
-  description  String?
-  isLive       Boolean  @default(true)
+  id            String   @id // e.g. FRE1D, MHF4U
+  name          String
+  description   String?
+  isLive        Boolean  @default(true)
 
-  teacherId    String?
-  teacher      User?    @relation("TeacherCourses", fields: [teacherId], references: [id])
+  vectorStoreId String?
 
-  vectorStoreId String? // OpenAI vector store id for this course
-
-  enrollments  Enrollment[]
-  files        CourseFile[]
+  // Relations
+  enrollments   Enrollment[]
+  files         CourseFile[]
   conversations Conversation[]
+
+  // ✅ Multi-teacher support:
+  teachers      CourseTeacher[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model CourseTeacher {
+  id        String   @id @default(cuid())
+  courseId  String
+  teacherId String
+
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacher   User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([courseId, teacherId])
+  @@index([courseId])
+  @@index([teacherId])
+}
+
+model CourseFile {
+  id           String   @id @default(cuid())
+  courseId     String
+  uploaderId   String
+
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  uploader     User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  originalName String
+  storagePath  String
+  mimeType     String
+  sizeBytes    Int
+
+  // Topic/module/unit grouping
+  topic        String?
+
+  openaiFileId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([courseId])
+  @@index([uploaderId])
 }
 
 model Enrollment {
@@ -56,8 +101,8 @@ model Enrollment {
   courseId  String
   status    String   @default("active") // active | inactive
 
-  user      User     @relation(fields: [userId], references: [id])
-  course    Course   @relation(fields: [courseId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -66,33 +111,14 @@ model Enrollment {
   @@index([userId])
 }
 
-model CourseFile {
-  id           String   @id @default(cuid())
-  courseId     String
-  uploaderId   String
-
-  course       Course   @relation(fields: [courseId], references: [id])
-  uploader     User     @relation(fields: [uploaderId], references: [id])
-
-  originalName String
-  storagePath  String
-  mimeType     String
-  sizeBytes    Int
-  openaiFileId String?
-
-  createdAt DateTime @default(now())
-
-  @@index([courseId])
-}
-
 model Conversation {
   id        String   @id @default(cuid())
   userId    String
   courseId  String
   title     String?
 
-  user      User     @relation(fields: [userId], references: [id])
-  course    Course   @relation(fields: [courseId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   messages  Message[]
 
@@ -110,10 +136,11 @@ model Message {
   role           String   // user | assistant
   content        String
 
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-  user           User         @relation(fields: [userId], references: [id])
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([conversationId])
+  @@index([userId])
 }
