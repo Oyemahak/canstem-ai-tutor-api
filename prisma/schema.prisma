@@ -42,6 +42,7 @@ model Course {
   description   String?
   isLive        Boolean  @default(true)
 
+  // Optional: if you later use OpenAI-managed vector stores per course
   vectorStoreId String?
 
   // Relations
@@ -51,6 +52,9 @@ model Course {
 
   // ✅ Multi-teacher support:
   teachers      CourseTeacher[]
+
+  // ✅ RAG chunks per course:
+  chunks        CourseMaterialChunk[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -76,8 +80,8 @@ model CourseFile {
   courseId     String
   uploaderId   String
 
-  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  uploader     User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  course       Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  uploader     User   @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
 
   originalName String
   storagePath  String
@@ -87,7 +91,11 @@ model CourseFile {
   // Topic/module/unit grouping
   topic        String?
 
+  // Optional: if you upload to OpenAI files later
   openaiFileId String?
+
+  // ✅ RAG chunks created from this file:
+  chunks       CourseMaterialChunk[]
 
   createdAt DateTime @default(now())
 
@@ -117,8 +125,8 @@ model Conversation {
   courseId  String
   title     String?
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   messages  Message[]
 
@@ -143,4 +151,35 @@ model Message {
 
   @@index([conversationId])
   @@index([userId])
+}
+
+/**
+ * ✅ RAG table: stores extracted text chunks + embeddings per course (and per file).
+ * MVP: store embedding as Json array (later you can migrate to pgvector).
+ */
+model CourseMaterialChunk {
+  id         String   @id @default(cuid())
+  courseId   String
+  fileId     String?
+
+  // Optional metadata
+  title      String?
+  topic      String?
+  chunkIndex Int
+
+  // The actual chunk text
+  content    String
+
+  // Embedding vector stored as JSON array (MVP)
+  embedding  Json
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  course     Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  file       CourseFile? @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([fileId])
+  @@index([courseId, topic])
 }
