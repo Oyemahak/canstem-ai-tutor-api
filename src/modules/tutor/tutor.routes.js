@@ -1,3 +1,4 @@
+// src/modules/tutor/tutor.routes.js
 const router = require("express").Router();
 const { prisma } = require("../../db/prisma");
 const { requireAuth } = require("../../middleware/requireAuth");
@@ -52,6 +53,7 @@ router.post("/chat", requireAuth, async (req, res) => {
 
   const result = await buildTutorAnswer({
     course,
+    conversationId: convoId,
     userMessage: String(message),
   });
 
@@ -64,6 +66,7 @@ router.post("/chat", requireAuth, async (req, res) => {
     conversationId: convoId,
     answer: result.answer,
     sources: result.sources || [],
+    mode: result.mode || "materials_first",
   });
 });
 
