@@ -1,3 +1,4 @@
+// src/app.js
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -18,12 +19,18 @@ const realtimeRoutes = require("./modules/realtime/realtime.routes");
 
 const app = express();
 
+// ✅ IMPORTANT (Render / reverse proxies): needed for Secure cookies + correct protocol
+app.set("trust proxy", 1);
+
 app.use(helmet());
 app.use(morgan("dev"));
 
 app.use(
   cors({
-    origin: (process.env.CORS_ORIGIN || "http://localhost:3000").split(","),
+    origin: (process.env.CORS_ORIGIN || "http://localhost:3000")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
     credentials: true,
   })
 );

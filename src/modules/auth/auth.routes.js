@@ -4,6 +4,21 @@ const jwt = require("jsonwebtoken");
 const { prisma } = require("../../db/prisma");
 const { requireAuth } = require("../../middleware/requireAuth");
 
+function isProd() {
+  return process.env.NODE_ENV === "production";
+}
+
+function cookieOptions() {
+  const prod = isProd();
+  return {
+    httpOnly: true,
+    secure: prod,                 // ✅ must be true on https (Render)
+    sameSite: prod ? "none" : "lax", // ✅ cross-site cookie for Vercel -> Render
+    path: "/",                    // ✅ important for clearCookie consistency
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+}
+
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -21,18 +36,21 @@ router.post("/login", async (req, res) => {
   });
 
   const cookieName = process.env.COOKIE_NAME || "canstem_session";
-  res.cookie(cookieName, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  });
 
-  res.json({ ok: true, user: { id: user.id, email: user.email, role: user.role, name: user.name } });
+  res.cookie(cookieName, token, cookieOptions());
+
+  res.json({
+    ok: true,
+    user: { id: user.id, email: user.email, role: user.role, name: user.name },
+  });
 });
 
 router.post("/logout", (req, res) => {
   const cookieName = process.env.COOKIE_NAME || "canstem_session";
-  res.clearCookie(cookieName);
+
+  // ✅ must match sameSite/secure/path used on set
+  res.clearCookie(cookieName, cookieOptions());
+
   res.json({ ok: true });
 });
 
